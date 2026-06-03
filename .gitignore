@@ -1,0 +1,5 @@
+.env
+logs/
+data/
+*.pyc
+router_pw

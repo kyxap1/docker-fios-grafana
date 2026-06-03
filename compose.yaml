@@ -1,0 +1,29 @@
+include:
+  - compose.monitoring.yaml
+
+services:
+  cron:
+    build:
+      dockerfile_inline: |
+        FROM alpine:latest
+        RUN apk add --no-cache syslog-ng
+    depends_on:
+      - alloy
+    volumes:
+      - ./scripts/get_fw_log.sh:/etc/periodic/15min/get-fw-log:ro
+      - ./config/cron/client.conf:/etc/syslog-ng/client.conf:ro
+      - cron-data:/data
+    secrets:
+      - router_pw
+    environment:
+      - ROUTER_IP=${ROUTER_IP:-192.168.1.1}
+      - HOME_IP=${HOME_IP}
+    command: ["crond", "-f"]
+    restart: unless-stopped
+
+secrets:
+  router_pw:
+    file: ./router_pw
+
+volumes:
+  cron-data:

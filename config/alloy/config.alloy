@@ -1,0 +1,26 @@
+loki.source.syslog "firewall" {
+  listener {
+    address       = "0.0.0.0:514"
+    protocol      = "udp"
+    syslog_format = "raw"
+    labels        = { job = "firewall" }
+  }
+  forward_to = [loki.process.firewall.receiver]
+}
+
+loki.process "firewall" {
+  stage.regex {
+    expression = "^(?P<timestamp>\\w+ +\\d+ \\d+:\\d+:\\d+) "
+  }
+  stage.timestamp {
+    source = "timestamp"
+    format = "Jan _2 15:04:05"
+  }
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
