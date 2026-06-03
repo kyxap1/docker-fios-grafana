@@ -1,0 +1,184 @@
+{
+  "uid": "firewall-overview",
+  "title": "Firewall — Outbound Connections",
+  "tags": ["firewall", "network"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "1m",
+  "time": { "from": "now-12h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total New Connections",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "uid": "loki", "type": "loki" },
+      "targets": [{
+        "expr": "sum(count_over_time({job=\"firewall\"} |= \"new connection\" [$__auto]))",
+        "queryType": "range"
+      }],
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["sum"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 5000}, {"color": "red", "value": 20000}] } } }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Connections / min",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "uid": "loki", "type": "loki" },
+      "targets": [{
+        "expr": "sum(rate({job=\"firewall\"} |= \"new connection\" [$__auto])) * 60",
+        "queryType": "range"
+      }],
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["mean"] } },
+      "fieldConfig": { "defaults": { "unit": "cpm", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 100}, {"color": "red", "value": 500}] } } }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Top Talker",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "uid": "loki", "type": "loki" },
+      "targets": [{
+        "expr": "topk(1, sum by (src) (count_over_time({job=\"firewall\"} |= \"new connection\" | pattern `<_> SRC=<src> DST=<_>` [$__range])))",
+        "queryType": "instant",
+        "legendFormat": "{{src}}"
+      }],
+      "options": { "colorMode": "value", "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color": "red", "value": null}] } } }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "New Connections Over Time — by Source IP",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 4 },
+      "datasource": { "uid": "loki", "type": "loki" },
+      "targets": [{
+        "expr": "sum by (src) (count_over_time({job=\"firewall\"} |= \"new connection\" | pattern `<_> SRC=<src> DST=<_>` [$__auto]))",
+        "queryType": "range",
+        "legendFormat": "{{src}}"
+      }],
+      "options": { "tooltip": { "mode": "multi", "sort": "desc" } },
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 15, "stacking": { "mode": "normal" }, "lineWidth": 1 } } }
+    },
+    {
+      "id": 20,
+      "type": "barchart",
+      "title": "Top Source IPs (local network)",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 13 },
+      "datasource": { "uid": "loki", "type": "loki" },
+      "targets": [{
+        "expr": "topk(10, sum by (src) (count_over_time({job=\"firewall\"} |= \"new connection\" | pattern `<_> SRC=<src> DST=<_>` [$__range])))",
+        "queryType": "instant",
+        "legendFormat": "{{src}}"
+      }],
+      "options": { "orientation": "horizontal", "barWidth": 0.7, "showValue": "always", "xTickLabelMaxLength": 20 },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "displayName": "Connections" } },
+      "transformations": [
+        { "id": "seriesToRows", "options": {} },
+        { "id": "sortBy", "options": { "sort": [{ "field": "Value", "desc": true }] } }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "barchart",
+      "title": "Top Destination IPs (external)",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 13 },
+      "datasource": { "uid": "loki", "type": "loki" },
+      "targets": [{
+        "expr": "topk(10, sum by (dst) (count_over_time({job=\"firewall\"} |= \"new connection\" | pattern `<_> SRC=<_> DST=<dst> <_>` | dst !~ `^(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|100\\.)` [$__range])))",
+        "queryType": "instant",
+        "legendFormat": "{{dst}}"
+      }],
+      "options": { "orientation": "horizontal", "barWidth": 0.7, "showValue": "always" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "displayName": "Connections" } },
+      "transformations": [
+        { "id": "seriesToRows", "options": {} },
+        { "id": "sortBy", "options": { "sort": [{ "field": "Value", "desc": true }] } }
+      ]
+    },
+    {
+      "id": 30,
+      "type": "piechart",
+      "title": "Protocol Distribution",
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 22 },
+      "datasource": { "uid": "loki", "type": "loki" },
+      "targets": [{
+        "expr": "sum by (proto) (count_over_time({job=\"firewall\"} |= \"IPTABLES\" | pattern `<_> PROTO=<proto> SPT=<_>` [$__range]))",
+        "queryType": "instant",
+        "legendFormat": "{{proto}}"
+      }],
+      "options": { "legend": { "displayMode": "table", "placement": "right", "values": ["percent", "value"] }, "pieType": "donut", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 31,
+      "type": "barchart",
+      "title": "Top Destination Ports",
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 22 },
+      "datasource": { "uid": "loki", "type": "loki" },
+      "targets": [{
+        "expr": "topk(10, sum by (dpt) (count_over_time({job=\"firewall\"} |= \"IPTABLES\" | pattern `<_> PROTO=<_> SPT=<_> DPT=<dpt> <_>` [$__range])))",
+        "queryType": "instant",
+        "legendFormat": "{{dpt}}"
+      }],
+      "options": { "orientation": "horizontal", "barWidth": 0.7, "showValue": "always" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "displayName": "Connections" } },
+      "transformations": [
+        { "id": "seriesToRows", "options": {} },
+        { "id": "sortBy", "options": { "sort": [{ "field": "Value", "desc": true }] } }
+      ]
+    },
+    {
+      "id": 32,
+      "type": "table",
+      "title": "Top Connections: Source → Destination:Port",
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 22 },
+      "datasource": { "uid": "loki", "type": "loki" },
+      "targets": [{
+        "expr": "topk(25, sum by (src, dst, dpt, proto) (count_over_time({job=\"firewall\"} |= \"new connection\" | pattern `<_> SRC=<src> DST=<dst> <_> PROTO=<proto> SPT=<_> DPT=<dpt> <_>` [$__range])))",
+        "queryType": "instant",
+        "legendFormat": "",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Value" }, "properties": [{ "id": "custom.width", "value": 70 }, { "id": "displayName", "value": "Count" }] },
+          { "matcher": { "id": "byName", "options": "Metric" }, "properties": [{ "id": "custom.hidden", "value": true }] }
+        ]
+      },
+      "transformations": [
+        { "id": "seriesToRows", "options": {} },
+        { "id": "extractFields", "options": { "source": "Metric", "format": "kvp" } },
+        { "id": "organize", "options": { "excludeByName": { "Metric": true, "Time": true }, "indexByName": { "src": 0, "dst": 1, "dpt": 2, "proto": 3, "Value": 4 }, "renameByName": { "src": "Source", "dst": "Destination", "dpt": "Port", "proto": "Proto", "Value": "Count" } } },
+        { "id": "sortBy", "options": { "sort": [{ "field": "Count", "desc": true }] } }
+      ]
+    },
+    {
+      "id": 40,
+      "type": "timeseries",
+      "title": "Connection Rate by Source IP (per minute)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 31 },
+      "datasource": { "uid": "loki", "type": "loki" },
+      "targets": [{
+        "expr": "topk(10, sum by (src) (rate({job=\"firewall\"} |= \"new connection\" | pattern `<_> SRC=<src> DST=<_>` [$__auto]))) * 60",
+        "queryType": "range",
+        "legendFormat": "{{src}}"
+      }],
+      "options": { "tooltip": { "mode": "multi", "sort": "desc" } },
+      "fieldConfig": { "defaults": { "unit": "cpm", "custom": { "fillOpacity": 10, "lineWidth": 2 } } }
+    },
+    {
+      "id": 50,
+      "type": "logs",
+      "title": "Firewall Logs",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 39 },
+      "datasource": { "uid": "loki", "type": "loki" },
+      "targets": [{
+        "expr": "{job=\"firewall\"} |= \"IPTABLES\"",
+        "queryType": "range"
+      }],
+      "options": { "showTime": true, "showLabels": false, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": false, "enableLogDetails": true, "sortOrder": "Descending", "dedupStrategy": "none" }
+    }
+  ]
+}

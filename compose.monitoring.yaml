@@ -1,0 +1,39 @@
+services:
+  loki:
+    image: grafana/loki:3.7.2
+    command: ["-config.file=/etc/loki/config.yaml"]
+    volumes:
+      - ./config/loki/config.yaml:/etc/loki/config.yaml:ro
+      - ./data/loki:/loki
+    restart: unless-stopped
+
+  alloy:
+    image: grafana/alloy:v1.16.1
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --stability.level=experimental
+      - /etc/alloy/config.alloy
+    ports:
+      - "514:514/udp"
+    volumes:
+      - ./config/alloy/config.alloy:/etc/alloy/config.alloy:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.0.1
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./data/grafana/data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
